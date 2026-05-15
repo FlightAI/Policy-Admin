@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>element³ — Policy Admin</title>
+  <style>
+    /* ── Reset & base ────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #f8f8f6;
+      color: #1a1a1a;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────────────────── */
+    .header {
+      background: #1a1a1a;
+      color: #fff;
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      gap: 16px;
+    }
+    .header-brand { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+    .header-store { font-size: 13px; color: #888; }
+
+    /* ── Layout ──────────────────────────────────────────────────────────── */
+    .layout { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ─────────────────────────────────────────────────────────── */
+    .sidebar {
+      width: 216px;
+      background: #fff;
+      border-right: 1px solid #e8e8e8;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .sidebar-heading {
+      padding: 16px 20px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: #aaa;
+    }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      cursor: pointer;
+      font-size: 14px;
+      color: #444;
+      border-left: 3px solid transparent;
+      user-select: none;
+    }
+    .nav-item:hover  { background: #f8f8f6; }
+    .nav-item.active { color: #1a1a1a; font-weight: 600; border-left-color: #1a1a1a; background: #f4f4f2; }
+    .nav-count {
+      font-size: 11px;
+      color: #999;
+      background: #f0f0ee;
+      border-radius: 10px;
+      padding: 2px 7px;
+      font-weight: 500;
+    }
+    .nav-item.active .nav-count { background: #e4e4e2; color: #555; }
+
+    /* ── Main split pane ─────────────────────────────────────────────────── */
+    .main { flex: 1; display: flex; overflow: hidden; }
+
+    /* ── Section list pane ───────────────────────────────────────────────── */
+    .list-pane {
+      width: 320px;
+      border-right: 1px solid #e8e8e8;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      background: #fff;
+    }
+    .pane-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid #e8e8e8;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .pane-title { font-size: 14px; font-weight: 600; }
+
+    .section-items { flex: 1; overflow-y: auto; }
+    .section-item {
+      padding: 12px 16px;
+      border-bottom: 1px solid #f2f2f0;
+      cursor: pointer;
+    }
+    .section-item:hover  { background: #f8f8f6; }
+    .section-item.active { background: #eef4ff; }
+    .item-row { display: flex; align-items: flex-start; gap: 8px; }
+    .item-meta { flex: 1; min-width: 0; }
+    .item-num     { font-size: 11px; font-weight: 700; color: #999; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .item-heading { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-eyebrow { font-size: 12px; color: #777; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-reorder { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+    .reorder-btn {
+      background: none;
+      border: 1px solid #e0e0e0;
+      border-radius: 3px;
+      width: 22px;
+      height: 18px;
+      cursor: pointer;
+      font-size: 9px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .reorder-btn:hover:not(:disabled) { background: #f0f0f0; color: #333; }
+    .reorder-btn:disabled { opacity: 0.3; cursor: default; }
+
+    .empty-state {
+      padding: 48px 24px;
+      text-align: center;
+      color: #aaa;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    /* ── Editor pane ─────────────────────────────────────────────────────── */
+    .editor-pane {
+      flex: 1;
+      overflow-y: auto;
+      padding: 32px 40px;
+    }
+    .editor-pane.placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #aaa;
+      font-size: 14px;
+    }
+
+    .editor-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 28px;
+      gap: 16px;
+    }
+    .editor-title { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+    .editor-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+    .form-wrap { max-width: 640px; }
+
+    /* ── Buttons ─────────────────────────────────────────────────────────── */
+    .btn {
+      padding: 8px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      transition: opacity 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover   { opacity: 0.82; }
+    .btn:active  { opacity: 0.95; }
+    .btn-primary   { background: #1a1a1a; color: #fff; }
+    .btn-secondary { background: #ededeb; color: #1a1a1a; }
+    .btn-danger    { background: #dc2626; color: #fff; }
+    .btn-sm        { padding: 6px 11px; font-size: 12px; }
+
+    /* ── Form fields ─────────────────────────────────────────────────────── */
+    .field-group { margin-bottom: 22px; }
+    .field-row   { display: flex; gap: 16px; }
+    .field-row .field-group { flex: 1; }
+
+    .field-label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 6px;
+    }
+    .field-req { color: #dc2626; }
+    .field-hint { font-size: 12px; color: #888; margin-top: 5px; line-height: 1.5; }
+
+    .input, .textarea, .select {
+      width: 100%;
+      border: 1px solid #d4d4d0;
+      border-radius: 6px;
+      padding: 9px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #1a1a1a;
+      background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .input:focus, .textarea:focus, .select:focus {
+      outline: none;
+      border-color: #1a1a1a;
+      box-shadow: 0 0 0 3px rgba(26,26,26,0.08);
+    }
+    .input-narrow { max-width: 120px; }
+    .textarea {
+      min-height: 220px;
+      resize: vertical;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+    .textarea-note {
+      background: #fffbeb;
+      border-color: #fcd34d;
+    }
+
+    /* ── Handle preview ──────────────────────────────────────────────────── */
+    .handle-preview {
+      font-size: 12px;
+      color: #888;
+      margin-top: 5px;
+      font-family: monospace;
+    }
+    .handle-preview span { color: #1a1a1a; font-weight: 600; }
+
+    /* ── Toast ───────────────────────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: #1a1a1a;
+      color: #fff;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      z-index: 1000;
+      transform: translateY(72px);
+      opacity: 0;
+      transition: transform 0.22s ease, opacity 0.22s ease;
+      max-width: 360px;
+    }
+    .toast.show    { transform: translateY(0); opacity: 1; }
+    .toast.error   { background: #dc2626; }
+    .toast.success { background: #16a34a; }
+
+    /* ── Loading overlay ─────────────────────────────────────────────────── */
+    .loading {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(255,255,255,0.65);
+      align-items: center;
+      justify-content: center;
+      z-index: 999;
+      font-size: 14px;
+      color: #555;
+      font-weight: 500;
+    }
+    .loading.show { display: flex; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ──────────────────────────────────────────────────────────────── -->
+<header class="header">
+  <span class="header-brand">element³ — Policy Admin</span>
+  <span class="header-store" id="store-name">Connecting…</span>
+</header>
+
+<!-- ── Layout ──────────────────────────────────────────────────────────────── -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <p class="sidebar-heading">Policies</p>
+    <nav id="policy-nav"></nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+
+    <!-- Section list -->
+    <div class="list-pane">
+      <div class="pane-header">
+        <span class="pane-title" id="list-title">Sections</span>
+        <button class="btn btn-primary btn-sm" onclick="startCreate()">+ New section</button>
+      </div>
+      <div class="section-items" id="section-list"></div>
+    </div>
+
+    <!-- Editor -->
+    <div class="editor-pane placeholder" id="editor-pane">
+      <p>Select a section to edit, or click <strong>+ New section</strong>.</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ── Overlays ─────────────────────────────────────────────────────────────── -->
+<div class="toast" id="toast"></div>
+<div class="loading" id="loading">Saving…</div>
+
+
+<script>
+'use strict';
+
+// ── Config ────────────────────────────────────────────────────────────────────
+
+const API_VERSION = '2025-01'; // Update in api/graphql.js too if bumped
+
+const POLICIES = [
+  { key: 'privacy',      label: 'Privacy Policy'         },
+  { key: 'tc',           label: 'Terms & Conditions'      },
+  { key: 'returns',      label: 'Returns Policy'          },
+  { key: 'subscription', label: 'Subscription Terms'      },
+  { key: 'health-data',  label: 'Consumer Health Data'    },
+  { key: 'reviews',      label: 'Reviews Policy'          },
+  { key: 'accessibility',label: 'Accessibility Statement' },
+  { key: 'medical',      label: 'Medical Disclaimer'      },
+  { key: 'cookies',      label: 'Cookie Policy'           },
+  { key: 'sourcing',     label: 'Ingredient Sourcing'     },
+];
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+const state = {
+  sections:     [],       // All policy_section metaobjects from Shopify
+  activePolicy: 'privacy',
+  editing:      null,     // Section object currently open in the editor
+  isNew:        false,    // true = creating, false = editing existing
+};
+
+// ── GraphQL transport ─────────────────────────────────────────────────────────
+
+async function gql(query, variables = {}) {
+  const res = await fetch('/api/graphql', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ query, variables }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+  const json = await res.json();
+  if (json.errors?.length) throw new Error(json.errors.map(e => e.message).join('\n'));
+  return json.data;
+}
+
+// ── GraphQL operations ────────────────────────────────────────────────────────
+
+const Q_SHOP = `{ shop { name } }`;
+
+const Q_SECTIONS = `
+  query PolicySections($cursor: String) {
+    metaobjects(type: "policy_section", first: 50, after: $cursor) {
+      nodes {
+        id
+        handle
+        fields { key value }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+`;
+
+const M_CREATE = `
+  mutation PolicySectionCreate($metaobject: MetaobjectCreateInput!) {
+    metaobjectCreate(metaobject: $metaobject) {
+      metaobject { id handle fields { key value } }
+      userErrors  { field message }
+    }
+  }
+`;
+
+const M_UPDATE = `
+  mutation PolicySectionUpdate($id: ID!, $metaobject: MetaobjectUpdateInput!) {
+    metaobjectUpdate(id: $id, metaobject: $metaobject) {
+      metaobject { id handle fields { key value } }
+      userErrors  { field message }
+    }
+  }
+`;
+
+const M_DELETE = `
+  mutation PolicySectionDelete($id: ID!) {
+    metaobjectDelete(id: $id) {
+      deletedId
+      userErrors { field message }
+    }
+  }
+`;
+
+// ── Data helpers ──────────────────────────────────────────────────────────────
+
+function getField(section, key) {
+  const f = (section.fields || []).find(f => f.key === key);
+  return f ? (f.value ?? null) : null;
+}
+
+/** Sections for the active policy, sorted by section_number ascending. */
+function activeSections() {
+  return state.sections
+    .filter(s => getField(s, 'policy_type') === state.activePolicy)
+    .sort((a, b) => {
+      const na = parseInt(getField(a, 'section_number') ?? 0, 10);
+      const nb = parseInt(getField(b, 'section_number') ?? 0, 10);
+      return na - nb;
+    });
+}
+
+/** Derive a handle from policy type, section number, and heading. */
+function buildHandle(policyType, sectionNum, heading) {
+  const num  = String(sectionNum).padStart(2, '0');
+  const slug = (heading || '')
+    .toLowerCase()
+    .replace(/[''`]/g, '')
+    .replace(/[³²¹]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  return `${policyType}-${num}-${slug}`;
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────────
+
+async function loadAll() {
+  const shopData = await gql(Q_SHOP);
+  document.getElementById('store-name').textContent = shopData.shop.name;
+
+  let sections = [];
+  let cursor   = null;
+  do {
+    const data = await gql(Q_SECTIONS, { cursor });
+    sections   = sections.concat(data.metaobjects.nodes);
+    cursor     = data.metaobjects.pageInfo.hasNextPage
+      ? data.metaobjects.pageInfo.endCursor
+      : null;
+  } while (cursor);
+
+  state.sections = sections;
+}
+
+async function reloadSections() {
+  let sections = [];
+  let cursor   = null;
+  do {
+    const data = await gql(Q_SECTIONS, { cursor });
+    sections   = sections.concat(data.metaobjects.nodes);
+    cursor     = data.metaobjects.pageInfo.hasNextPage
+      ? data.metaobjects.pageInfo.endCursor
+      : null;
+  } while (cursor);
+  state.sections = sections;
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+
+function switchPolicy(key) {
+  state.activePolicy = key;
+  state.editing      = null;
+  state.isNew        = false;
+  render();
+}
+
+function startCreate() {
+  state.editing = null;
+  state.isNew   = true;
+  render();
+}
+
+function startEdit(id) {
+  state.editing = state.sections.find(s => s.id === id) ?? null;
+  state.isNew   = false;
+  render();
+}
+
+function cancelEdit() {
+  state.editing = null;
+  state.isNew   = false;
+  render();
+}
+
+async function saveSection() {
+  const form = document.getElementById('editor-form');
+  if (!form) return;
+
+  const numRaw  = form.section_number.value.trim();
+  const eyebrow = form.eyebrow_label.value.trim();
+  const heading = form.heading.value.trim();
+  const body    = form.body.value.trim();
+
+  if (!heading) return toast('Heading is required.', 'error');
+
+  const sectionNum = parseInt(numRaw, 10) || (activeSections().length + 1);
+  const handle     = buildHandle(state.activePolicy, sectionNum, heading);
+
+  const fields = [
+    { key: 'policy_type',    value: state.activePolicy },
+    { key: 'section_number', value: String(sectionNum) },
+    { key: 'eyebrow_label',  value: eyebrow            },
+    { key: 'heading',        value: heading             },
+    { key: 'body',           value: body                },
+  ];
+
+  showLoading(true);
+  try {
+    if (state.isNew) {
+      const data = await gql(M_CREATE, { metaobject: { type: 'policy_section', handle, fields } });
+      const errs = data.metaobjectCreate.userErrors;
+      if (errs.length) throw new Error(errs.map(e => `${e.field}: ${e.message}`).join('\n'));
+      state.sections.push(data.metaobjectCreate.metaobject);
+      state.editing = data.metaobjectCreate.metaobject;
+      state.isNew   = false;
+      toast('Section created.', 'success');
+    } else {
+      const data = await gql(M_UPDATE, { id: state.editing.id, metaobject: { handle, fields } });
+      const errs = data.metaobjectUpdate.userErrors;
+      if (errs.length) throw new Error(errs.map(e => `${e.field}: ${e.message}`).join('\n'));
+      const updated  = data.metaobjectUpdate.metaobject;
+      state.sections = state.sections.map(s => s.id === updated.id ? updated : s);
+      state.editing  = updated;
+      toast('Section saved.', 'success');
+    }
+    render();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function deleteSection() {
+  if (!state.editing) return;
+  const heading = getField(state.editing, 'heading') || 'this section';
+  if (!confirm(`Delete "${heading}"? This cannot be undone.`)) return;
+
+  showLoading(true);
+  try {
+    const data = await gql(M_DELETE, { id: state.editing.id });
+    const errs = data.metaobjectDelete.userErrors;
+    if (errs.length) throw new Error(errs.map(e => e.message).join('\n'));
+    state.sections = state.sections.filter(s => s.id !== state.editing.id);
+    state.editing  = null;
+    state.isNew    = false;
+    toast('Section deleted.', 'success');
+    render();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function moveSection(id, direction) {
+  const siblings = activeSections();
+  const idx      = siblings.findIndex(s => s.id === id);
+  const swapIdx  = direction === 'up' ? idx - 1 : idx + 1;
+  if (swapIdx < 0 || swapIdx >= siblings.length) return;
+
+  const a    = siblings[idx];
+  const b    = siblings[swapIdx];
+  const numA = parseInt(getField(a, 'section_number') ?? idx + 1,     10);
+  const numB = parseInt(getField(b, 'section_number') ?? swapIdx + 1, 10);
+
+  showLoading(true);
+  try {
+    await Promise.all([
+      gql(M_UPDATE, { id: a.id, metaobject: { fields: [{ key: 'section_number', value: String(numB) }] } }),
+      gql(M_UPDATE, { id: b.id, metaobject: { fields: [{ key: 'section_number', value: String(numA) }] } }),
+    ]);
+    await reloadSections();
+    render();
+  } catch (err) {
+    toast(err.message, 'error');
+  } finally {
+    showLoading(false);
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+function render() {
+  renderNav();
+  renderList();
+  renderEditor();
+}
+
+function renderNav() {
+  document.getElementById('policy-nav').innerHTML = POLICIES.map(p => {
+    const count  = state.sections.filter(s => getField(s, 'policy_type') === p.key).length;
+    const active = p.key === state.activePolicy ? 'active' : '';
+    return `
+      <div class="nav-item ${active}" onclick="switchPolicy('${p.key}')">
+        ${esc(p.label)}
+        <span class="nav-count">${count}</span>
+      </div>`;
+  }).join('');
+}
+
+function renderList() {
+  const policy   = POLICIES.find(p => p.key === state.activePolicy);
+  const sections = activeSections();
+
+  document.getElementById('list-title').textContent = policy.label;
+
+  const list = document.getElementById('section-list');
+  if (!sections.length) {
+    list.innerHTML = `<div class="empty-state">No sections yet.<br>Click <strong>+ New section</strong> to add one.</div>`;
+    return;
+  }
+
+  list.innerHTML = sections.map((s, i) => {
+    const num     = getField(s, 'section_number') ?? (i + 1);
+    const heading = getField(s, 'heading')        ?? '(untitled)';
+    const eyebrow = getField(s, 'eyebrow_label')  ?? '';
+    const active  = state.editing?.id === s.id ? 'active' : '';
+    const isFirst = i === 0;
+    const isLast  = i === sections.length - 1;
+    const sid     = escAttr(s.id);
+
+    return `
+      <div class="section-item ${active}" onclick="startEdit('${sid}')">
+        <div class="item-row">
+          <div class="item-meta">
+            <div class="item-num">Section ${num}</div>
+            <div class="item-heading">${esc(heading)}</div>
+            ${eyebrow ? `<div class="item-eyebrow">${esc(eyebrow)}</div>` : ''}
+          </div>
+          <div class="item-reorder" onclick="event.stopPropagation()">
+            <button class="reorder-btn" title="Move up"
+              ${isFirst ? 'disabled' : `onclick="moveSection('${sid}','up')"`}>▲</button>
+            <button class="reorder-btn" title="Move down"
+              ${isLast  ? 'disabled' : `onclick="moveSection('${sid}','down')"`}>▼</button>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderEditor() {
+  const pane = document.getElementById('editor-pane');
+
+  if (!state.editing && !state.isNew) {
+    pane.className = 'editor-pane placeholder';
+    pane.innerHTML = '<p>Select a section to edit, or click <strong>+ New section</strong>.</p>';
+    return;
+  }
+
+  pane.className = 'editor-pane';
+
+  const s        = state.editing;
+  const nextNum  = activeSections().length + 1;
+  const num      = s ? (getField(s, 'section_number') ?? nextNum) : nextNum;
+  const eyebrow  = s ? (getField(s, 'eyebrow_label')  ?? '') : '';
+  const heading  = s ? (getField(s, 'heading')         ?? '') : '';
+  const body     = s ? (getField(s, 'body')            ?? '') : '';
+  const title    = state.isNew ? 'New section' : esc(heading) || 'Edit section';
+  const previewHandle = buildHandle(state.activePolicy, num, heading);
+
+  pane.innerHTML = `
+    <div class="form-wrap">
+      <div class="editor-header">
+        <h2 class="editor-title">${title}</h2>
+        <div class="editor-actions">
+          ${s ? `<button class="btn btn-danger btn-sm" onclick="deleteSection()">Delete</button>` : ''}
+          <button class="btn btn-secondary btn-sm" onclick="cancelEdit()">Cancel</button>
+          <button class="btn btn-primary btn-sm" onclick="saveSection()">Save</button>
+        </div>
+      </div>
+
+      <form id="editor-form" onsubmit="event.preventDefault(); saveSection()">
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label" for="f-num">Section Number</label>
+            <input class="input input-narrow" type="number" id="f-num"
+                   name="section_number" value="${escAttr(num)}" min="1"
+                   oninput="updateHandlePreview()">
+            <p class="field-hint">Controls display order.</p>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="f-eyebrow">Eyebrow Label</label>
+            <input class="input" type="text" id="f-eyebrow"
+                   name="eyebrow_label" value="${escAttr(eyebrow)}"
+                   placeholder="e.g. Introduction">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="f-heading">
+            Heading <span class="field-req">*</span>
+          </label>
+          <input class="input" type="text" id="f-heading"
+                 name="heading" value="${escAttr(heading)}"
+                 placeholder="Section heading" required
+                 oninput="updateHandlePreview()">
+          <p class="handle-preview">Handle: <span id="handle-preview">${esc(previewHandle)}</span></p>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="f-body">Body</label>
+          <!--
+            TODO: Replace this textarea with a WYSIWYG editor (e.g. Quill.js) wired
+            to the Shopify rich_text_field JSON format. The FAQ Admin implementation
+            can serve as a reference for the Quill delta ↔ Shopify rich text conversion.
+            Until then, paste the raw Shopify rich text JSON here directly.
+          -->
+          <textarea class="textarea textarea-note" id="f-body" name="body"
+            placeholder='{"type":"root","children":[{"type":"paragraph","children":[{"type":"text","value":"Enter content here."}]}]}'
+          >${esc(body)}</textarea>
+          <p class="field-hint">
+            ⚠️ Accepts Shopify rich text JSON. Replace with WYSIWYG editor before production use.
+          </p>
+        </div>
+
+      </form>
+    </div>`;
+}
+
+function updateHandlePreview() {
+  const form = document.getElementById('editor-form');
+  if (!form) return;
+  const num     = parseInt(form.section_number.value, 10) || 1;
+  const heading = form.heading.value;
+  const preview = document.getElementById('handle-preview');
+  if (preview) preview.textContent = buildHandle(state.activePolicy, num, heading);
+}
+
+// ── UI utilities ──────────────────────────────────────────────────────────────
+
+function esc(str) {
+  return String(str ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function escAttr(str) { return String(str ?? '').replace(/"/g, '&quot;'); }
+
+let _toastTimer;
+function toast(msg, type = 'success') {
+  const el    = document.getElementById('toast');
+  el.textContent = msg;
+  el.className   = `toast show ${type}`;
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { el.className = 'toast'; }, 3500);
+}
+
+function showLoading(show) {
+  document.getElementById('loading').className = `loading${show ? ' show' : ''}`;
+}
+
+// ── Initialise ────────────────────────────────────────────────────────────────
+
+(async function init() {
+  try {
+    await loadAll();
+    render();
+  } catch (err) {
+    document.body.style.cssText = 'padding:48px;font-family:monospace';
+    document.body.innerHTML = `
+      <strong style="color:#dc2626">Failed to connect to Shopify.</strong><br><br>
+      ${esc(err.message)}<br><br>
+      <span style="color:#555">Check that <code>SHOPIFY_ACCESS_TOKEN</code> is set in Vercel
+      Environment Variables and that the token has the required scopes.</span>`;
+  }
+})();
+</script>
+</body>
+</html>
