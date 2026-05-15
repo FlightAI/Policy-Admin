@@ -4,6 +4,46 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>element³ — Policy Admin</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/trix@2.1.4/dist/trix.css">
+  <style>
+    /* ── Trix WYSIWYG overrides ──────────────────────────────────────────────── */
+    trix-toolbar {
+      border: 1px solid #d4d4d0;
+      border-radius: 6px 6px 0 0;
+      background: #fafaf8;
+      padding: 4px 6px;
+    }
+    trix-toolbar .trix-button-group {
+      border: 1px solid #d4d4d0;
+      border-radius: 4px;
+    }
+    trix-toolbar .trix-button {
+      border: none;
+      color: #555;
+      font-size: 12px;
+    }
+    trix-toolbar .trix-button:hover { background: #f0f0ee; color: #1a1a1a; }
+    trix-toolbar .trix-button.trix-active { background: #e4e4e2; color: #1a1a1a; }
+    trix-editor {
+      border: 1px solid #d4d4d0;
+      border-top: none;
+      border-radius: 0 0 6px 6px;
+      padding: 10px 12px;
+      min-height: 220px;
+      font-size: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #fff;
+    }
+    trix-editor:focus {
+      outline: none;
+      border-color: #1a1a1a;
+      box-shadow: 0 0 0 3px rgba(26,26,26,0.08);
+    }
+    trix-editor ul, trix-editor ol { padding-left: 1.4em; }
+    trix-editor a { color: #2563eb; text-decoration: underline; }
+  </style>
   <style>
     /* ── Reset & base ────────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -320,16 +360,16 @@
 const API_VERSION = '2025-01'; // Update in api/graphql.js too if bumped
 
 const POLICIES = [
-  { key: 'privacy',      label: 'Privacy Policy'         },
-  { key: 'tc',           label: 'Terms & Conditions'      },
-  { key: 'returns',      label: 'Returns Policy'          },
-  { key: 'subscription', label: 'Subscription Terms'      },
-  { key: 'health-data',  label: 'Consumer Health Data'    },
-  { key: 'reviews',      label: 'Reviews Policy'          },
-  { key: 'accessibility',label: 'Accessibility Statement' },
-  { key: 'medical',      label: 'Medical Disclaimer'      },
-  { key: 'cookies',      label: 'Cookie Policy'           },
-  { key: 'sourcing',     label: 'Ingredient Sourcing'     },
+  { key: 'privacy',       label: 'Privacy Policy'         },
+  { key: 'tc',            label: 'Terms & Conditions'      },
+  { key: 'returns',       label: 'Returns Policy'          },
+  { key: 'subscription',  label: 'Subscription Terms'      },
+  { key: 'health-data',   label: 'Consumer Health Data'    },
+  { key: 'reviews',       label: 'Reviews Policy'          },
+  { key: 'accessibility', label: 'Accessibility Statement' },
+  { key: 'medical',       label: 'Medical Disclaimer'      },
+  { key: 'cookies',       label: 'Cookie Policy'           },
+  { key: 'sourcing',      label: 'Ingredient Sourcing'     },
 ];
 
 // ── State ─────────────────────────────────────────────────────────────────────
@@ -495,7 +535,8 @@ async function saveSection() {
   const numRaw  = form.section_number.value.trim();
   const eyebrow = form.eyebrow_label.value.trim();
   const heading = form.heading.value.trim();
-  const body    = form.body.value.trim();
+  const bodyHtml = (document.getElementById('f-body')?.value ?? '');
+  const body    = htmlToShopifyRichText(bodyHtml);
 
   if (!heading) return toast('Heading is required.', 'error');
 
@@ -585,6 +626,113 @@ async function moveSection(id, direction) {
   }
 }
 
+// ── Rich-text converters ──────────────────────────────────────────────────────
+
+/** Shopify rich-text AST → HTML that Trix can edit. */
+function shopifyRichTextToHtml(value) {
+  if (!value) return '';
+  let ast;
+  try { ast = JSON.parse(value); } catch { return value; }
+  if (!ast || ast.type !== 'root') return String(value);
+  return (ast.children || []).map(blockToHtml).join('');
+}
+
+function blockToHtml(node) {
+  if (!node) return '';
+  switch (node.type) {
+    case 'paragraph':
+      return `<div>${(node.children || []).map(inlineToHtml).join('')}</div>`;
+    case 'heading': {
+      const lvl = node.level || 2;
+      return `<h${lvl}>${(node.children || []).map(inlineToHtml).join('')}</h${lvl}>`;
+    }
+    case 'list': {
+      const tag = node.listType === 'ordered' ? 'ol' : 'ul';
+      return `<${tag}>${(node.children || []).map(blockToHtml).join('')}</${tag}>`;
+    }
+    case 'list-item':
+      return `<li>${(node.children || []).map(inlineToHtml).join('')}</li>`;
+    default:
+      return inlineToHtml(node);
+  }
+}
+
+function inlineToHtml(node) {
+  if (!node) return '';
+  if (node.type === 'text') {
+    let t = (node.value || '')
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    if (node.bold)   t = `<strong>${t}</strong>`;
+    if (node.italic) t = `<em>${t}</em>`;
+    return t;
+  }
+  if (node.type === 'link') {
+    const href = (node.url || '').replace(/"/g, '&quot;');
+    return `<a href="${href}">${(node.children || []).map(inlineToHtml).join('')}</a>`;
+  }
+  return '';
+}
+
+/** Trix HTML output → Shopify rich-text AST (JSON string). */
+function htmlToShopifyRichText(html) {
+  const empty = JSON.stringify({
+    type: 'root',
+    children: [{ type: 'paragraph', children: [{ type: 'text', value: '' }] }],
+  });
+  if (!html || !html.trim()) return empty;
+
+  const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
+
+  function parseInline(el) {
+    const nodes = [];
+    for (const child of el.childNodes) {
+      if (child.nodeType === Node.TEXT_NODE) {
+        const v = child.textContent;
+        if (v) nodes.push({ type: 'text', value: v });
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const tag = child.tagName.toLowerCase();
+        if (tag === 'br') continue;
+        if (tag === 'strong' || tag === 'b') {
+          parseInline(child).forEach(n => nodes.push(n.type === 'text' ? { ...n, bold: true } : n));
+        } else if (tag === 'em' || tag === 'i') {
+          parseInline(child).forEach(n => nodes.push(n.type === 'text' ? { ...n, italic: true } : n));
+        } else if (tag === 'a') {
+          nodes.push({ type: 'link', url: child.getAttribute('href') || '', children: parseInline(child) });
+        } else {
+          nodes.push(...parseInline(child));
+        }
+      }
+    }
+    return nodes;
+  }
+
+  function parseBlock(el) {
+    const tag = el.tagName?.toLowerCase();
+    if (!tag) return null;
+    if (tag === 'div' || tag === 'p') {
+      const inlines = parseInline(el);
+      return { type: 'paragraph', children: inlines.length ? inlines : [{ type: 'text', value: '' }] };
+    }
+    if (tag === 'ul' || tag === 'ol') {
+      return {
+        type: 'list',
+        listType: tag === 'ol' ? 'ordered' : 'unordered',
+        children: [...el.querySelectorAll(':scope > li')].map(li => ({
+          type: 'list-item',
+          children: parseInline(li),
+        })),
+      };
+    }
+    if (/^h[1-6]$/.test(tag)) {
+      return { type: 'heading', level: parseInt(tag[1]), children: parseInline(el) };
+    }
+    return null;
+  }
+
+  const children = [...doc.body.children].map(parseBlock).filter(Boolean);
+  return JSON.stringify({ type: 'root', children: children.length ? children : [{ type: 'paragraph', children: [{ type: 'text', value: '' }] }] });
+}
+
 // ── Render ────────────────────────────────────────────────────────────────────
 
 function render() {
@@ -665,6 +813,8 @@ function renderEditor() {
   const title    = state.isNew ? 'New section' : esc(heading) || 'Edit section';
   const previewHandle = buildHandle(state.activePolicy, num, heading);
 
+  const bodyHtml = shopifyRichTextToHtml(body);
+
   pane.innerHTML = `
     <div class="form-wrap">
       <div class="editor-header">
@@ -707,22 +857,20 @@ function renderEditor() {
 
         <div class="field-group">
           <label class="field-label" for="f-body">Body</label>
-          <!--
-            TODO: Replace this textarea with a WYSIWYG editor (e.g. Quill.js) wired
-            to the Shopify rich_text_field JSON format. The FAQ Admin implementation
-            can serve as a reference for the Quill delta ↔ Shopify rich text conversion.
-            Until then, paste the raw Shopify rich text JSON here directly.
-          -->
-          <textarea class="textarea textarea-note" id="f-body" name="body"
-            placeholder='{"type":"root","children":[{"type":"paragraph","children":[{"type":"text","value":"Enter content here."}]}]}'
-          >${esc(body)}</textarea>
-          <p class="field-hint">
-            ⚠️ Accepts Shopify rich text JSON. Replace with WYSIWYG editor before production use.
-          </p>
+          <input type="hidden" id="f-body" name="body">
+          <trix-editor input="f-body" id="f-body-editor"></trix-editor>
         </div>
 
       </form>
     </div>`;
+
+  // Load body content into Trix
+  const trixEl = pane.querySelector('trix-editor');
+  if (trixEl) {
+    const load = () => trixEl.editor.loadHTML(bodyHtml);
+    if (trixEl.editor) { load(); }
+    else { trixEl.addEventListener('trix-initialize', load, { once: true }); }
+  }
 }
 
 function updateHandlePreview() {
@@ -772,5 +920,6 @@ function showLoading(show) {
   }
 })();
 </script>
+<script src="https://cdn.jsdelivr.net/npm/trix@2.1.4/dist/trix.umd.min.js"></script>
 </body>
 </html>
