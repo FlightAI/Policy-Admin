@@ -1,6 +1,6 @@
 # element³ Policy Admin
 
-A single-page admin tool for managing `policy_section` metaobjects in the element³ Shopify store.
+A single page admin tool for managing `policy_section` metaobjects in the element³ Shopify store.
 Hosted on Vercel (deployed via GitHub), using a serverless proxy to forward GraphQL requests to the
 Shopify Admin API with a static access token.
 
