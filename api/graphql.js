@@ -7,7 +7,7 @@
  */
 
 const SHOPIFY_STORE   = 'cf6huz-e6.myshopify.com';
-const SHOPIFY_API_VER = '2025-01';
+const SHOPIFY_API_VER = '2025-04';
 
 export default async function handler(req, res) {
   // CORS preflight
